@@ -1,12 +1,8 @@
 #include "Client.hpp"
 
 
-Client::Tcp::Tcp() : _port(32999),_clientSockFd(0),_msgLen(2000)
-{
-    memset(&_clientSockAddr,'\0',sizeof(_clientSockAddr));
-}
 
-Client::Tcp::Tcp(uint16_t p_port) : _port(p_port),_clientSockFd(0),_msgLen(2000)
+Client::Tcp::Tcp(uint16_t p_port = 32999) : _port(p_port),_clientSockFd(0),_msgLen(2000)
 {
     memset(&_clientSockAddr,'\0',sizeof(_clientSockAddr));
 }

@@ -20,7 +20,6 @@ namespace Server
         size_t _msglen;
 
     public:
-        Tcp();
         explicit Tcp(uint16_t p_port);
         void prepareAndWaitForClient();
         void acceptClient();

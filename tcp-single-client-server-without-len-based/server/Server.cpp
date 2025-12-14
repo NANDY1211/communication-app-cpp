@@ -1,13 +1,6 @@
 #include "Server.hpp"
 
-Server::Tcp::Tcp() : _sockFd(0), _port(32999), _clientSockFd(0), _msglen(2000)
-{
-    memset(&_sockAddr, '\0', sizeof(_sockAddr));
-    memset(&_clientSockAddr, '\0', sizeof(_clientSockAddr));
-    _clientSockSize = sizeof(sockaddr);
-}
-
-Server::Tcp::Tcp(uint16_t p_port) : _sockFd(0), _port(p_port), _clientSockFd(0), _msglen(2000)
+Server::Tcp::Tcp(uint16_t p_port = 32999) : _sockFd(0), _port(p_port), _clientSockFd(0), _msglen(2000)
 {
     memset(&_sockAddr, '\0', sizeof(_sockAddr));
     memset(&_clientSockAddr, '\0', sizeof(_clientSockAddr));

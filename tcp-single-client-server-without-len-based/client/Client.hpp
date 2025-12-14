@@ -19,7 +19,6 @@ namespace Client
             std::string _msg;
 
         public:
-            Tcp();
             explicit Tcp(uint16_t p_port);
             void prepareAndConnectToServer();
             void sendMsg();
