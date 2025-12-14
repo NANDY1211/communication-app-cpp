@@ -1,11 +1,6 @@
 #include "Client.hpp"
 
-Client::Tcp::Tcp() : _clientSockFd(0), _port(32999), _msgLen(0)
-{
-    memset(&_clientSockAddr, 0, sizeof(_clientSockAddr));
-};
-
-Client::Tcp::Tcp(uint16_t p_port) : _clientSockFd(0), _port(p_port), _msgLen(0)
+Client::Tcp::Tcp(uint16_t p_port = 32999) : _clientSockFd(0), _port(p_port), _msgLen(0)
 {
     memset(&_clientSockAddr, 0, sizeof(_clientSockAddr));
 };
@@ -13,7 +8,7 @@ Client::Tcp::Tcp(uint16_t p_port) : _clientSockFd(0), _port(p_port), _msgLen(0)
 void Client::Tcp::prepareSocketAndConnectToServer()
 {
     // Create a socket with address family , socket type and protocol
-    _clientSockFd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    _clientSockFd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if (_clientSockFd < 0)
     {
@@ -30,58 +25,96 @@ void Client::Tcp::prepareSocketAndConnectToServer()
 
     // Connect client with server
 
-    if (connect(_clientSockFd, (struct sockaddr *)&_clientSockAddr, sizeof(_clientSockAddr)) < 0)
+    if (::connect(_clientSockFd,
+                  reinterpret_cast<sockaddr *>(&_clientSockAddr),
+                  sizeof(_clientSockAddr)) < 0)
     {
-        std::cerr << "connecting to server failed \n";
+        perror("connect");
         return;
     }
 }
 
-void Client::Tcp::sendMsgToServer()
+bool Client::Tcp::sendMessage(const std::string &msg)
 {
-    std::string clientMsg{"Hi , this is Client"};
-    uint32_t msgLen = htonl(clientMsg.size());
+    uint32_t netLen = htonl(static_cast<uint32_t>(msg.size()));
+    ssize_t n1 = ::send(_clientSockFd, &netLen, sizeof(netLen), MSG_NOSIGNAL);
+    if (n1 != sizeof(netLen))
+        return false;
 
-    send(_clientSockFd, &msgLen, sizeof(msgLen), 0);          // sending length first to server
-    send(_clientSockFd, clientMsg.c_str(), clientMsg.size(), 0); // sending the actual message
+    ssize_t n2 = ::send(_clientSockFd, msg.c_str(), msg.size(), MSG_NOSIGNAL);
+    return n2 == static_cast<ssize_t>(msg.size());
 }
 
-int Client::Tcp::recvMsgLength()
+bool Client::Tcp::receiveMessage(std::string &outMsg)
 {
-    recv(_clientSockFd, &_msgLen, sizeof(_msgLen), 0);
+    uint32_t netLen = 0;
+    if (recv_all(_clientSockFd, &netLen, sizeof(netLen)) <= 0)
+        return false;
+    uint32_t len = ntohl(netLen);
 
-    std::cout << "Expecting message of length: " << ntohl(_msgLen) << std::endl;
-    return _msgLen;
-}
-
-void Client::Tcp::recvMsg()
-{
-    if (recvMsgLength() < 0)
+    const uint32_t kMaxMsg = 8u * 1024u * 1024u; // cap at 8MB
+    if (len == 0 || len > kMaxMsg)
     {
-        std::cerr << "Receive message failed \n";
-        return;
+        std::cerr << "Invalid message length: " << len << "\n";
+        return false;
     }
-    char *userTempBuffer = new char[_msgLen + 1];
-    memset(userTempBuffer, '\0', _msgLen + 1);
 
-    recv(_clientSockFd, userTempBuffer, _msgLen, 0);
-
-    std::cout << userTempBuffer << std::endl;
-
-    delete[] userTempBuffer;
+    outMsg.resize(len);
+    if (recv_all(_clientSockFd, &outMsg[0], len) <= 0)
+        return false;
+    return true;
 }
 
 void Client::Tcp::closeConnection()
 {
-    shutdown(_clientSockFd, SHUT_RDWR);
-    close(_clientSockFd);
+    if (_clientSockFd >= 0)
+    {
+        ::shutdown(_clientSockFd, SHUT_RDWR);
+        ::close(_clientSockFd);
+        _clientSockFd = -1;
+    }
 }
+
+ssize_t Client::Tcp::recv_all(int fd, void *buf, size_t len)
+{
+    char *p = static_cast<char *>(buf);
+    size_t done = 0;
+    while (done < len)
+    {
+        ssize_t n = ::recv(fd, p + done, len - done, 0);
+        if (n < 0)
+        {
+            if (errno == EINTR)
+                continue;
+            return -1;
+        }
+        if (n == 0)
+            return 0; // peer closed
+        done += static_cast<size_t>(n);
+    }
+    return static_cast<ssize_t>(done);
+}
+
 
 int main()
 {
-    Client::Tcp clientIns1;
-    clientIns1.prepareSocketAndConnectToServer();
-    clientIns1.sendMsgToServer();
-    clientIns1.recvMsg();
-    clientIns1.closeConnection();
+    Client::Tcp client;
+    client.prepareSocketAndConnectToServer();
+
+     // Send a message
+    if (!client.sendMessage("Hi, this is Client")) {
+        std::cerr << "Failed to send message\n";
+        client.closeConnection();
+        return 1;
+    }
+
+    // Receive response
+    std::string response;
+    if (client.receiveMessage(response)) {
+        std::cout << "Received from server: " << response << "\n";
+    } else {
+        std::cerr << "Failed to receive response\n";
+    }
+
+    client.closeConnection();
 }

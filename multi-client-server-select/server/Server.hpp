@@ -17,7 +17,7 @@ namespace Server
             uint16_t _masterSock;
             uint16_t _clientSockFd;
             uint16_t _maxFd;
-            uint16_t _tempFd;
+            uint16_t _clientFd;
             size_t _msgLen;
             sockaddr_in _sockAddr;
             sockaddr_in _clientSockAddr;
@@ -26,15 +26,15 @@ namespace Server
             fd_set _tempFds;
 
         public:
-            Tcp();
             Tcp(uint16_t p_port);
             void prepareAndListenToclients();
             void waitingAndAcceptingConnections();
-            void sendAckToClient(uint16_t p_fd);
-            void closeConnection();
+            static bool sendMessage(int clientFd, const std::string &msg);
+            void closeConnection(int _fd);
             void recvMsg();
-            ssize_t recv_all(int fd, void* buf, size_t len); 
-            int receiveMsgLen();
+            static ssize_t recv_all(int fd, void *buf, size_t len); 
+            void acceptClients();
+            bool receiveAndProcess(int fd);
 
     };
 }

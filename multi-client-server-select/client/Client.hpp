@@ -16,12 +16,14 @@ namespace Client
         std::string _msg;
 
     public:
-        Tcp();
         explicit Tcp(uint16_t p_port);
         void prepareSocketAndConnectToServer();
         void recvMsg();
+        static ssize_t recv_all(int fd, void *buf, size_t len);
         int recvMsgLength();
         void sendMsgToServer();
+        bool sendMessage(const std::string &msg);
+        bool receiveMessage(std::string &outMsg);
         void closeConnection();
     };
 }
