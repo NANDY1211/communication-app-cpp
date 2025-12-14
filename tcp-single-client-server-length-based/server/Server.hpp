@@ -21,7 +21,6 @@ namespace Server
             uint16_t _port;
 
         public:
-            Tcp();
             explicit Tcp(uint16_t p_port);
             void prepareSocketAndWaitForClient();
             void acceptClient();

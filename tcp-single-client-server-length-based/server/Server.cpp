@@ -1,13 +1,7 @@
 #include "Server.hpp"
 
-Server::Tcp::Tcp() : _sockFd(0), _clientSock(-1), _msgLen(0) , _port(32999)
-{
-    memset(&_sockAddr, 0, sizeof(_sockAddr));
-    memset(&_clientSockAddr, 0, sizeof(_clientSockAddr));
-    _clientSockSize = sizeof(_clientSockAddr);
-}; // defaut port
 
-Server::Tcp::Tcp(uint16_t p_port) : _sockFd(0), _clientSock(-1),  _msgLen(0) , _port(p_port)
+Server::Tcp::Tcp(uint16_t p_port = 32999) : _sockFd(0), _clientSock(-1),  _msgLen(0) , _port(p_port)
 {
     memset(&_sockAddr, 0, sizeof(_sockAddr));
     memset(&_clientSockAddr, 0, sizeof(_clientSockAddr));
@@ -18,7 +12,7 @@ void Server::Tcp::prepareSocketAndWaitForClient()
 {
     // Create a socket with it's address family , type of socket and with protocol
 
-    _sockFd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    _sockFd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if (_sockFd < 0)
     {
@@ -33,21 +27,29 @@ void Server::Tcp::prepareSocketAndWaitForClient()
     memset(&_sockAddr.sin_zero, 0, sizeof(_sockAddr.sin_zero));
 
     int yes = 1;
-    setsockopt(_sockFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+    if(::setsockopt(_sockFd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0)
+    {
+        ::close(_sockFd);
+        _sockFd = -1;
+    }
 
     // Bind the Sockt address with socket
 
-    if (bind(_sockFd, (sockaddr *)&_sockAddr, sizeof(_sockAddr)) < 0)
+    if (::bind(_sockFd, (sockaddr *)&_sockAddr, sizeof(_sockAddr)) < 0)
     {
         std::cerr << "Binding socket address with socket failed\n";
+        ::close(_sockFd);
+        _sockFd = -1;
         return;
     }
 
     // Listening to the client to get connected , means client will try to handshake here
 
-    if (listen(_sockFd, 10) < 0)
+    if (::listen(_sockFd, 10) < 0)
     {
         std::cerr << "Listening to the socket failed \n";
+        ::close(_sockFd);
+        _sockFd = -1;
         return;
     }
 }
@@ -58,7 +60,7 @@ void Server::Tcp::acceptClient()
     _clientSockSize = sizeof(_clientSockAddr);
 
     // After handshake accept new incoming clients
-    _clientSock = accept(_sockFd, (sockaddr *)&_clientSockAddr, &_clientSockSize);
+    _clientSock = ::accept(_sockFd, (sockaddr *)&_clientSockAddr, &_clientSockSize);
 
     if (_clientSock < 0)
     {
@@ -88,7 +90,11 @@ void Server::Tcp::recvMsg()
     }
     char *userTempBuffer = new char[_msgLen + 1];
  
-    recv(_clientSock, userTempBuffer, _msgLen, 0);
+    if(recv(_clientSock, userTempBuffer, _msgLen, 0)<=0)
+    {
+        std::cerr<<"Invalid Message \n";
+        ::close(_clientSock);
+    }
 
     std::cout<< userTempBuffer << std::endl;
     delete[] userTempBuffer;
@@ -107,6 +113,7 @@ void Server::Tcp::closeConnection()
 {
     shutdown(_clientSock, SHUT_RDWR);
     close(_clientSock);
+    close(_sockFd);
 }
 
 int main()
